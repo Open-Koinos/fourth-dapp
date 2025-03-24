@@ -1,0 +1,347 @@
+/* 
+ * minimal.css - Lightweight B&W design for mobile PWA
+ * Optimized for performance and readability
+ */
+
+ :root {
+    /* Core palette */
+    --b: #000;
+    --dg: #333;
+    --mg: #777;
+    --lg: #eee;
+    --w: #fff;
+    
+    /* Functional colors */
+    --text: var(--dg);
+    --bg: var(--w);
+    --border: var(--lg);
+    --primary: var(--b);
+  }
+  
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 15px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--primary);
+    text-align: center;
+  }
+  
+  h3 {
+    margin-bottom: 15px;
+    color: var(--primary);
+  }
+  
+  p, label, input, button, select {
+    font-size: 1rem;
+  }
+  
+  small {
+    display: block;
+    margin-top: 5px;
+    color: var(--mg);
+  }
+  
+  .container {
+    width: 100%;
+    max-width: 500px;
+    background-color: var(--w);
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin: 0 auto 20px;
+  }
+  
+  .status-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 10px 15px;
+    background-color: var(--lg);
+    border-radius: 4px;
+  }
+  
+  .status {
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+  }
+  
+  .status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  
+  .connected {
+    background-color: var(--dg);
+  }
+  
+  .disconnected {
+    background-color: var(--b);
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  
+  input, select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 16px;
+  }
+  
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  
+  button, .btn {
+    background-color: var(--primary);
+    color: var(--w);
+    border: none;
+    border-radius: 4px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: 0.2s ease;
+    width: 100%;
+  }
+  
+  button:hover, .btn:hover {
+    opacity: 0.9;
+  }
+  
+  button:active, .btn:active {
+    transform: scale(0.98);
+  }
+  
+  button:disabled, .btn:disabled {
+    background-color: var(--lg);
+    color: var(--mg);
+    cursor: not-allowed;
+  }
+  
+  .settings-toggle {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 14px;
+    padding: 5px;
+    width: auto;
+    text-align: center;
+    margin: 10px auto;
+    display: block;
+    cursor: pointer;
+  }
+  
+  .settings-toggle:hover {
+    text-decoration: underline;
+    background: none;
+  }
+  
+  .settings-panel {
+    background-color: var(--lg);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    display: none;
+  }
+  
+  .session-timer {
+    font-size: 14px;
+    color: var(--mg);
+    margin-top: 10px;
+    text-align: center;
+    display: none;
+  }
+  
+  .loading {
+    text-align: center;
+    margin: 20px 0;
+    display: none;
+  }
+  
+  .loader {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(0,0,0,0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .result-container {
+    background-color: var(--lg);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 25px;
+    display: none;
+    text-align: center;
+  }
+  
+  .result-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--primary);
+  }
+  
+  .balance-display {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 15px 0;
+  }
+  
+  .address-display {
+    font-size: 14px;
+    color: var(--mg);
+    word-break: break-all;
+  }
+  
+  .token-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    color: var(--mg);
+    font-size: 14px;
+  }
+  
+  .token-symbol {
+    font-weight: 600;
+  }
+  
+  /* Message notifications - retain color coding in monochrome */
+  .notification, .error-message, .info, .success, .error, .warning {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    display: none;
+  }
+  
+  /* Info message */
+  .info, .message {
+    background-color: var(--dg);
+    color: var(--w);
+    border-left: 3px solid var(--b);
+  }
+  
+  /* Success message */
+  .success, .notification {
+    background-color: var(--lg);
+    color: var(--b);
+    border-left: 3px solid var(--b);
+  }
+  
+  /* Error message */
+  .error, .error-message {
+    background-color: var(--b);
+    color: var(--w);
+    border-left: 3px solid var(--dg);
+  }
+  
+  /* Warning message */
+  .warning {
+    background-color: var(--w);
+    color: var(--b);
+    border: 1px solid var(--b);
+    border-left: 3px solid var(--b);
+  }
+  
+  #messages {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: calc(100% - 30px);
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .fadeIn {
+    animation: fadeIn 0.5s;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .fadeOut {
+    animation: fadeOut 0.5s;
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
+  }
+  
+  footer {
+    margin-top: auto;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    color: var(--mg);
+  }
+  
+  @media (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .container {
+      padding: 20px;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+    }
+  }

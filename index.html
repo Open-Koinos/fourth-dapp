@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.koinos.io; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>Koinos Token Balance Checker</title>
+    <link rel="stylesheet" href="minimal.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Koinos Token Balance</h1>
+        
+        <div class="status-container">
+            <div id="walletStatus">
+                <span class="status">
+                    <span class="status-indicator disconnected"></span>
+                    Wallet disconnected
+                </span>
+            </div>
+            <div id="walletBtn">
+                <button id="connectWalletBtn">Connect Wallet</button>
+            </div>
+        </div>
+        
+        <div class="session-timer" id="sessionTimer"></div>
+        
+        <button class="settings-toggle" id="settingsToggle">Session Settings</button>
+        
+        <div class="settings-panel" id="settingsPanel">
+            <h3>Session Settings</h3>
+            <div class="form-group">
+                <label for="autoLogoutSelect">Auto-Logout After:</label>
+                <select id="autoLogoutSelect">
+                    <option value="0">Never (Always Stay Logged In)</option>
+                    <option value="300000">5 Minutes</option>
+                    <option value="600000">10 Minutes</option>
+                    <option value="1800000">30 Minutes</option>
+                    <option value="3600000">1 Hour</option>
+                    <option value="7200000">2 Hours</option>
+                    <option value="14400000">4 Hours</option>
+                    <option value="28800000">8 Hours</option>
+                </select>
+                <small>Page will automatically log you out after this period of inactivity</small>
+            </div>
+            <div class="form-group">
+                <label for="persistentLoginCheck">
+                    <input type="checkbox" id="persistentLoginCheck" checked>
+                    Remember me (stay logged in when page refreshes)
+                </label>
+            </div>
+            <button id="applySettingsBtn">Apply Settings</button>
+        </div>
+        
+        <div id="notification" class="notification"></div>
+        <div id="errorMessage" class="error-message"></div>
+        
+        <div class="form-group">
+            <label for="tokenContract">Token Contract Address:</label>
+            <input type="text" id="tokenContract" value="15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL" placeholder="Enter token contract address" autocomplete="off" spellcheck="false">
+            <small>Default: KOIN (15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL)</small>
+        </div>
+        
+        <button id="getBalanceBtn" disabled>Check Balance</button>
+        
+        <div class="loading" id="loadingIndicator">
+            <div class="loader"></div>
+            <p>Fetching token data...</p>
+        </div>
+        
+        <div class="result-container" id="balanceResult">
+            <div class="result-title">Token Balance</div>
+            <div class="balance-display" id="balanceValue">0.00</div>
+            <div class="token-info">
+                <span id="tokenSymbol" class="token-symbol">KOIN</span>
+                <span id="tokenName"></span>
+            </div>
+            <div class="address-display" id="accountAddress"></div>
+        </div>
+    </div>
+    
+    <footer>
+        Powered by Open-K-alpha-SDK
+    </footer>
+
+    <script src="koinos.min.js"></script>
+    <script src="kondor.min.js"></script>
+    <script src="open-k-alpha-sdk.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
+            const walletStatusEl = document.getElementById('walletStatus');
+            const connectWalletBtn = document.getElementById('connectWalletBtn');
+            const getBalanceBtn = document.getElementById('getBalanceBtn');
+            const balanceResultEl = document.getElementById('balanceResult');
+            const balanceValueEl = document.getElementById('balanceValue');
+            const tokenSymbolEl = document.getElementById('tokenSymbol');
+            const tokenNameEl = document.getElementById('tokenName');
+            const accountAddressEl = document.getElementById('accountAddress');
+            const loadingIndicatorEl = document.getElementById('loadingIndicator');
+            const errorMessageEl = document.getElementById('errorMessage');
+            const notificationEl = document.getElementById('notification');
+            const settingsToggleBtn = document.getElementById('settingsToggle');
+            const settingsPanelEl = document.getElementById('settingsPanel');
+            const autoLogoutSelectEl = document.getElementById('autoLogoutSelect');
+            const persistentLoginCheckEl = document.getElementById('persistentLoginCheck');
+            const applySettingsBtn = document.getElementById('applySettingsBtn');
+            const sessionTimerEl = document.getElementById('sessionTimer');
+            
+            // Default settings
+            const defaultSettings = {
+                autoLogoutTimeout: 0, // Never auto-logout by default
+                persistentSession: true // Remember user by default
+            };
+            
+            // Load settings from localStorage
+            let settings = loadSettings();
+            
+            // Initialize SDK with secure storage and the loaded settings
+            const sdk = new OpenKAlphaSDK({
+                debugMode: false, // Disable debug mode to reduce console noise
+                storageTTL: 7 * 24 * 60 * 60 * 1000, // 7 days default session
+                autoLogoutTimeout: settings.autoLogoutTimeout,
+                persistentSession: settings.persistentSession,
+                trackUserActivity: true,
+                messageHandler: handleMessage
+            });
+            
+            // Initialize settings UI
+            initializeSettingsUI();
+            
+            // Event listeners
+            connectWalletBtn.addEventListener('click', toggleWalletConnection);
+            getBalanceBtn.addEventListener('click', fetchTokenBalance);
+            settingsToggleBtn.addEventListener('click', toggleSettingsPanel);
+            applySettingsBtn.addEventListener('click', applySettings);
+            
+            // Set up session timer display - only create one interval
+            if (!window.timerInterval) {
+                window.timerInterval = setInterval(updateSessionTimer, 1000);
+            }
+            
+            // Handle cleanup when the page unloads
+            window.addEventListener('beforeunload', () => {
+                if (window.timerInterval) {
+                    clearInterval(window.timerInterval);
+                }
+            });
+            
+            // Check wallet connection status on load
+            checkWalletStatus();
+            
+            // Initialize the timer
+            initializeTimer();
+            
+            // Load initial settings UI
+            updateSettingsUI();
+            
+            // Message handler for SDK - filter out noise
+            function handleMessage(message) {
+                // Skip logging timer status updates to reduce console spam
+                if (message.type === 'WALLET_STATUS') {
+                    return;
+                }
+                
+                console.log('SDK Message:', message);
+                
+                // Handle important messages for UI updates
+                switch(message.type) {
+                    case 'WALLET_CONNECTED':
+                        updateWalletUI(true, message.data.address);
+                        
+                        // Show reconnection notification
+                        if (message.data.reconnected) {
+                            showNotification("Automatically reconnected to your wallet session");
+                        }
+                        
+                        // Initialize timer after connection
+                        initializeTimer();
+                        break;
+                        
+                    case 'WALLET_DISCONNECTED':
+                        updateWalletUI(false);
+                        break;
+                        
+                    case 'AUTO_LOGOUT':
+                        showNotification("You have been automatically logged out due to inactivity");
+                        break;
+                        
+                    case 'AUTO_LOGOUT_CONFIGURED':
+                        // Reinitialize timer when auto-logout settings change
+                        initializeTimer();
+                        break;
+                        
+                    case 'API_ERROR':
+                        showError(`API Error: ${message.data.error.message}`);
+                        break;
+                }
+            }
+            
+            // Initialize timer
+            function initializeTimer() {
+                if (settings.autoLogoutTimeout > 0 && sdk.isConnected().data.connected) {
+                    // Force session expiry update to match current settings
+                    const expiryTime = Date.now() + settings.autoLogoutTimeout;
+                    sdk.secureStorage.setItem('session.expiryTime', expiryTime, settings.autoLogoutTimeout);
+                    
+                    // Make sure timer is visible
+                    sessionTimerEl.style.display = 'block';
+                    
+                    // Update immediately
+                    updateSessionTimer();
+                } else {
+                    sessionTimerEl.style.display = 'none';
+                }
+            }
+            
+            // Update session timer display with proper formatting for all time ranges
+            function updateSessionTimer() {
+                // Only update if auto-logout is enabled and user is logged in
+                if (settings.autoLogoutTimeout > 0 && sdk.isConnected().data.connected) {
+                    // Calculate time remaining
+                    const sessionExpiry = sdk.wallet.getSessionExpiry();
+                    if (sessionExpiry) {
+                        const now = Date.now();
+                        const timeRemaining = Math.max(0, sessionExpiry - now);
+                        
+                        // Format display based on remaining time
+                        if (timeRemaining > 0) {
+                            // For large time values (> 60 minutes), show hours
+                            if (timeRemaining > 3600000) { // More than an hour
+                                const hours = Math.floor(timeRemaining / 3600000);
+                                const minutes = Math.floor((timeRemaining % 3600000) / 60000);
+                                const seconds = Math.floor((timeRemaining % 60000) / 1000);
+                                sessionTimerEl.textContent = `Auto-logout in: ${hours}h ${minutes}m ${seconds}s`;
+                            } else {
+                                // Standard minutes:seconds display
+                                const minutes = Math.floor(timeRemaining / 60000);
+                                const seconds = Math.floor((timeRemaining % 60000) / 1000);
+                                sessionTimerEl.textContent = `Auto-logout in: ${minutes}m ${seconds}s`;
+                            }
+                        } else {
+                            sessionTimerEl.textContent = 'Session expired';
+                        }
+                    } else {
+                        sessionTimerEl.textContent = 'Session tracking unavailable';
+                    }
+                }
+            }
+            
+            // Load settings from localStorage
+            function loadSettings() {
+                try {
+                    const savedSettings = localStorage.getItem('koinosAppSettings');
+                    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+                } catch (error) {
+                    console.error('Error loading settings:', error);
+                    return defaultSettings;
+                }
+            }
+            
+            // Save settings to localStorage
+            function saveSettings(newSettings) {
+                try {
+                    localStorage.setItem('koinosAppSettings', JSON.stringify(newSettings));
+                } catch (error) {
+                    console.error('Error saving settings:', error);
+                }
+            }
+            
+            // Initialize settings UI with current values
+            function initializeSettingsUI() {
+                // Set initial values based on loaded settings
+                autoLogoutSelectEl.value = settings.autoLogoutTimeout.toString();
+                persistentLoginCheckEl.checked = settings.persistentSession;
+            }
+            
+            // Toggle settings panel visibility
+            function toggleSettingsPanel() {
+                if (settingsPanelEl.style.display === 'block') {
+                    settingsPanelEl.classList.add('fadeOut');
+                    setTimeout(() => {
+                        settingsPanelEl.style.display = 'none';
+                        settingsPanelEl.classList.remove('fadeOut');
+                    }, 300);
+                } else {
+                    settingsPanelEl.style.display = 'block';
+                    settingsPanelEl.classList.add('fadeIn');
+                    setTimeout(() => settingsPanelEl.classList.remove('fadeIn'), 300);
+                }
+            }
+            
+            // Apply settings changes with proper timer reset
+            function applySettings() {
+                // Get values from UI
+                const autoLogoutTimeout = parseInt(autoLogoutSelectEl.value);
+                const persistentSession = persistentLoginCheckEl.checked;
+                
+                // Update settings object
+                settings = {
+                    autoLogoutTimeout,
+                    persistentSession
+                };
+                
+                // Save to localStorage
+                saveSettings(settings);
+                
+                // Update SDK settings - this will reset the session expiry time
+                sdk.setAutoLogoutTimeout(autoLogoutTimeout);
+                
+                // Force refresh session timestamp when settings are applied
+                if (sdk.isConnected().data.connected && autoLogoutTimeout > 0) {
+                    // Force session timestamp update with the current address
+                    const address = sdk.wallet.getAddress();
+                    if (address) {
+                        sdk.wallet._storeSession(address, autoLogoutTimeout);
+                    }
+                }
+                
+                // Update UI
+                updateSettingsUI();
+                
+                // Hide settings panel
+                toggleSettingsPanel();
+                
+                // Show confirmation
+                showNotification("Settings applied successfully");
+            }
+            
+            // Update settings UI based on current settings
+            function updateSettingsUI() {
+                // Update auto-logout display
+                if (settings.autoLogoutTimeout > 0) {
+                    sessionTimerEl.style.display = 'block';
+                } else {
+                    sessionTimerEl.style.display = 'none';
+                }
+            }
+            
+            // Check wallet status
+            function checkWalletStatus() {
+                const status = sdk.isConnected();
+                if (status.data.connected) {
+                    updateWalletUI(true, status.data.address);
+                } else {
+                    updateWalletUI(false);
+                }
+            }
+            
+            // Update UI based on wallet connection status
+            function updateWalletUI(connected, address = null) {
+                if (connected) {
+                    walletStatusEl.innerHTML = `
+                        <span class="status">
+                            <span class="status-indicator connected"></span>
+                            Wallet connected
+                        </span>
+                    `;
+                    connectWalletBtn.textContent = 'Disconnect';
+                    getBalanceBtn.disabled = false;
+                    accountAddressEl.textContent = `Address: ${formatAddress(address)}`;
+                    
+                    // Show session timer if auto-logout is enabled
+                    if (settings.autoLogoutTimeout > 0) {
+                        sessionTimerEl.style.display = 'block';
+                        // Update timer immediately
+                        updateSessionTimer();
+                    }
+                } else {
+                    walletStatusEl.innerHTML = `
+                        <span class="status">
+                            <span class="status-indicator disconnected"></span>
+                            Wallet disconnected
+                        </span>
+                    `;
+                    connectWalletBtn.textContent = 'Connect Wallet';
+                    getBalanceBtn.disabled = true;
+                    
+                    // Hide session timer
+                    sessionTimerEl.style.display = 'none';
+                    
+                    // Hide balance result
+                    if (balanceResultEl.style.display !== 'none') {
+                        balanceResultEl.classList.add('fadeOut');
+                        setTimeout(() => {
+                            balanceResultEl.style.display = 'none';
+                            balanceResultEl.classList.remove('fadeOut');
+                        }, 300);
+                    }
+                }
+            }
+            
+            // Toggle wallet connection
+            async function toggleWalletConnection() {
+                const isConnected = sdk.isConnected().data.connected;
+                
+                if (isConnected) {
+                    sdk.disconnect();
+                } else {
+                    try {
+                        connectWalletBtn.disabled = true;
+                        connectWalletBtn.textContent = 'Connecting...';
+                        
+                        // Hide any previous errors
+                        hideError();
+                        
+                        // Connect with current persistent session setting
+                        await sdk.connect({
+                            saveSession: settings.persistentSession
+                        });
+                        
+                    } catch (error) {
+                        console.error('Connection error:', error);
+                        showError(`Connection failed: ${error.message}`);
+                    } finally {
+                        connectWalletBtn.disabled = false;
+                    }
+                }
+            }
+            
+            // Format address for display
+            function formatAddress(address) {
+                if (!address) return '';
+                return `${address.substring(0, 10)}...${address.slice(-8)}`;
+            }
+            
+            // Format token amount based on decimals
+            function formatAmount(amount, decimals = 8) {
+                if (!amount) return '0.00';
+                
+                const num = parseFloat(amount) / Math.pow(10, decimals);
+                return num.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: decimals
+                });
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorMessageEl.textContent = message;
+                errorMessageEl.style.display = 'block';
+                
+                // Hide loading indicator if it's showing
+                loadingIndicatorEl.style.display = 'none';
+                getBalanceBtn.disabled = false;
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    hideError();
+                }, 5000);
+            }
+            
+            // Hide error message
+            function hideError() {
+                errorMessageEl.style.display = 'none';
+            }
+            
+            // Show notification message
+            function showNotification(message) {
+                notificationEl.textContent = message;
+                notificationEl.style.display = 'block';
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    notificationEl.style.display = 'none';
+                }, 3000);
+            }
+            
+            // Fetch token data with proper error handling
+            async function fetchTokenBalance() {
+                try {
+                    const contractId = document.getElementById('tokenContract').value.trim();
+                    if (!contractId) {
+                        showError('Please enter a token contract address');
+                        return;
+                    }
+                    
+                    // Hide any previous errors
+                    hideError();
+                    
+                    // Show loading indicator with animation
+                    loadingIndicatorEl.style.display = 'block';
+                    loadingIndicatorEl.classList.add('fadeIn');
+                    getBalanceBtn.disabled = true;
+                    
+                    // Get wallet address
+                    const walletAddress = sdk.getAddress().data.address;
+                    
+                    // Use separate fetch calls for better error handling
+                    const tokenInfo = await sdk.client._request('GET', `/v1/token/${contractId}/info`);
+                    const balanceResponse = await sdk.client._request('GET', `/v1/token/${contractId}/balance/${walletAddress}`);
+                    
+                    // Process and display results
+                    const tokenData = {
+                        contractId,
+                        name: tokenInfo.name,
+                        symbol: tokenInfo.symbol,
+                        decimals: tokenInfo.decimals,
+                        balance: balanceResponse.value
+                    };
+                    
+                    displayResults(tokenData);
+                    
+                } catch (error) {
+                    console.error('Error fetching token data:', error);
+                    showError(`Failed to fetch token data: ${error.message}`);
+                } finally {
+                    // Hide loading indicator with animation
+                    loadingIndicatorEl.classList.add('fadeOut');
+                    setTimeout(() => {
+                        loadingIndicatorEl.style.display = 'none';
+                        loadingIndicatorEl.classList.remove('fadeOut');
+                        getBalanceBtn.disabled = false;
+                    }, 300);
+                }
+            }
+            
+            // Display all token results
+            function displayResults(tokenData) {
+                // Format balance
+                const formattedBalance = formatAmount(tokenData.balance, tokenData.decimals);
+                
+                // Update UI elements
+                balanceValueEl.textContent = formattedBalance;
+                tokenSymbolEl.textContent = tokenData.symbol || 'KOIN';
+                tokenNameEl.textContent = tokenData.name || '';
+                
+                // Show results with animation
+                balanceResultEl.style.display = 'block';
+                balanceResultEl.classList.add('fadeIn');
+                setTimeout(() => balanceResultEl.classList.remove('fadeIn'), 500);
+            }
+        });
+    </script>
+</body>
+</html>
